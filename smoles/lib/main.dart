@@ -1,3 +1,16 @@
+
+library flutter_blue_plus;
+
+import 'dart:async';
+import 'dart:io';
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'screens/bluetooth_off_screen.dart';
+import 'screens/scan_screen.dart';
+
+
 import 'package:english_words/english_words.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +20,18 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart'; // For CSV parsing
 import 'package:collection/collection.dart';
 import 'package:fl_chart/fl_chart.dart';
+
+part 'src/bluetooth_characteristic.dart';
+part 'src/bluetooth_descriptor.dart';
+part 'src/bluetooth_device.dart';
+part 'src/bluetooth_msgs.dart';
+part 'src/bluetooth_events.dart';
+part 'src/bluetooth_service.dart';
+part 'src/bluetooth_utils.dart';
+part 'flutter_blue_plus.dart';
+part 'src/guid.dart';
+part 'src/utils.dart';
+
 
 void main() {
   runApp(MyApp());
@@ -60,6 +85,8 @@ class _MyHomePageState extends State<MyHomePage> {
         page = Placeholder();
       case 2: 
         page = Placeholder();
+      case 3:
+        page = BTConnection();
       default:
         throw UnimplementedError('No widget for $selectedIndex');
     }
@@ -159,7 +186,7 @@ class AnalysisState extends State<Analysis> {
 
   // Your async function
   Future<void> fetchData() async {
-    var data = await parseCsvFile("data/240704_1214_standing_old-board.csv");
+    var data = await parseCsvFile("assets/data/240704_1214_standing_old-board.csv");
     setState(() {
       timestamps = data.timestamps;
       feet   = data.feet;
@@ -276,9 +303,95 @@ class AnalysisState extends State<Analysis> {
 } */
 
 
+// This widget shows BluetoothOffScreen or
+// ScanScreen depending on the adapter state
+//
+class BTConnection extends StatefulWidget {
+  const BTConnection({super.key});
 
+  @override
+  State<BTConnection> createState() => _FlutterBlueAppState();
+}
 
+class BluetoothOffScreen extends StatelessWidget {
+  final BluetoothAdapterState? adapterState;
 
+  const BluetoothOffScreen({super.key, required this.adapterState});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Text('Bluetooth is off'),
+      ),
+    );
+  }
+}
+
+class _FlutterBlueAppState extends State<BTConnection> {
+  BluetoothAdapterState? _adapterState = BluetoothAdapterState.unknown;
+
+  late StreamSubscription<BluetoothAdapterState> _adapterStateStateSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _adapterStateStateSubscription = FlutterBluePlus.adapterState.listen((state) {
+      _adapterState = state;
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _adapterStateStateSubscription.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget screen = _adapterState == BluetoothAdapterState.on
+        ? const ScanScreen()
+        : BluetoothOffScreen(adapterState: _adapterState!);
+
+    return MaterialApp(
+      color: Colors.lightBlue,
+      home: screen,
+      navigatorObservers: [BluetoothAdapterStateObserver()],
+    );
+  }
+}
+
+//
+// This observer listens for Bluetooth Off and dismisses the DeviceScreen
+//
+class BluetoothAdapterStateObserver extends NavigatorObserver {
+  StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
+
+  @override
+  void didPush(Route route, Route? previousRoute) {
+    super.didPush(route, previousRoute);
+    if (route.settings.name == '/DeviceScreen') {
+      // Start listening to Bluetooth state changes when a new route is pushed
+      _adapterStateSubscription ??= FlutterBluePlus.adapterState.listen((state) {
+        if (state != BluetoothAdapterState.on) {
+          // Pop the current route if Bluetooth is off
+          navigator?.pop();
+        }
+      });
+    }
+  }
+
+  @override
+  void didPop(Route route, Route? previousRoute) {
+    super.didPop(route, previousRoute);
+    // Cancel the subscription when the route is popped
+    _adapterStateSubscription?.cancel();
+    _adapterStateSubscription = null;
+  }
+}
 
 
 
@@ -345,10 +458,17 @@ List<List<int>> transpose(List<List<int>> matrix) {
 
     // Parse the CSV
     List<List<dynamic>> rows = const CsvToListConverter().convert(csvData);
+    print(rows);
 
   // Convert to NxM list using slices extension
-    int slices = 18;
-    final list2d = rows[0].slices(slices).toList();
+   // int slices = 18;
+     // rows[0].slices(slices).toList();
+    
+    for (int i = 0; i < rows.length - 1; i++) {
+      rows[i].removeLast();
+    }
+    final list2d = rows;
+    print(list2d);
 
 
     // Initialize arrays
