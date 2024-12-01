@@ -1,7 +1,6 @@
 # Smoles
-Smart insole connected to an app for a Hackathon
-Coded Flutter and Dart to run
-In developpement (things may be added later)
+Smart insole connected to an app for a Hackathon.
+In developpement (things should be added later)
 
 A preview of the thing so far :
 
