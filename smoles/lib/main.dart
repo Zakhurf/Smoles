@@ -32,8 +32,12 @@ class MyApp extends StatelessWidget {
 }
 
 class MyAppState extends ChangeNotifier {
+  int currentPlot = 0;
 
   // put some states change there
+  void toggleCurrentPlot(int value) {
+    currentPlot = value;
+  }
 
   
 }
@@ -150,8 +154,6 @@ class AnalysisState extends State<Analysis> {
   List<String> feet = [];
   List<List<int>> values =  [];
 
-
-  int _current_plot = 0;
   bool _isLoading = true;
 
 
@@ -173,13 +175,13 @@ class AnalysisState extends State<Analysis> {
     fetchData(); // Start fetching data when the widget is initialized
   }
 
-  Widget chooseWidget() {
+  Widget chooseWidget(int index) {
     if (_isLoading) {
       return CircularProgressIndicator();
     }
     else {
       var x = timestamps;
-      var y = values[15];
+      var y = values[index];
       //var x = [1,2,3,4];
       //var y = [5,6,7,8];
       return SizedBox(
@@ -217,8 +219,22 @@ class AnalysisState extends State<Analysis> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          chooseWidget(),
-          IntegerSlider(),
+          chooseWidget(appState.currentPlot),
+
+          Slider(
+            value: appState.currentPlot.toDouble(),
+            min: 0,
+            max: 16,
+            divisions: 100,  // Makes the slider snap to integer values
+            label: appState.currentPlot.round().toString(),
+            onChanged: (value) {
+              setState(() {
+                appState.currentPlot = value.toInt();
+              });
+            },
+          ),
+
+
           ElevatedButton(
             onPressed: () {
               //({List<int> timestamps, List<String> feet, List<List<int>> values}) data = await appState.parseCsvFile("data/240704_1214_standing_old-board.csv");
@@ -330,23 +346,10 @@ List<List<int>> transpose(List<List<int>> matrix) {
     // Parse the CSV
     List<List<dynamic>> rows = const CsvToListConverter().convert(csvData);
 
-    // Debug info
-    print(rows);
-    print(rows[0]);
-    int numRows = rows.length;
-    int numCols = rows.isNotEmpty ? rows[0].length : 0;
-    print('Dimensions: $numRows x $numCols');
-
   // Convert to NxM list using slices extension
     int slices = 19;
     final list2d = rows[0].slices(slices).toList();
 
-    // Debug info
-    print(list2d);
-    print(list2d[0]);
-    int numRowss = list2d.length;
-    int numColss = list2d.isNotEmpty ? list2d[0].length : 0;
-    print('Dimensions: $numRowss x $numColss');
 
     // Initialize arrays
     List<int> timestamps = [];
