@@ -6,6 +6,7 @@ import 'dart:convert'; // For utf8
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart'; // For CSV parsing
 import 'package:collection/collection.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 void main() {
   runApp(MyApp());
@@ -19,7 +20,7 @@ class MyApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (context) => MyAppState(),
       child: MaterialApp(
-        title: 'Namer App',
+        title: 'Smoles',
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
@@ -31,93 +32,10 @@ class MyApp extends StatelessWidget {
 }
 
 class MyAppState extends ChangeNotifier {
-  var current = WordPair.random();
 
-    // ↓ Add this.
-  void getNext() {
-    current = WordPair.random();
-    notifyListeners();
-  }
+  // put some states change there
 
-    // ↓ Add the code below.
-  var favorites = <WordPair>[];
-
-  void toggleFavorite() {
-    if (favorites.contains(current)) {
-      favorites.remove(current);
-    } else {
-      favorites.add(current);
-    }
-    notifyListeners();
-  }
-
-  Future<({
-    List<int> timestamps,
-    List<String> feet,
-    List<List<int>> values,
-  })> parseCsvFile(String filePath) async {
-    // Load the CSV file from assets
-    final String csvData = await rootBundle.loadString(filePath);
-
-    // Parse the CSV
-    List<List<dynamic>> rows = const CsvToListConverter().convert(csvData);
-
-    int numCols = 19;
-
-  // Convert to NxM list using slices extension
-    final list2d = rows[0].slices(numCols);
-    print(list2d);
-
-    print(list2d.length);
-    //print(list2d[0].length);
-
-    // Initialize arrays
-    List<int> timestamps = [];
-    List<String> feet = [];
-    List<List<int>> values = [];
-
-    // Extract data from rows
-    for (var row in list2d) {
-      timestamps.add(row[0] as int); 
-      feet.add(row[1] as String); 
-      // The remaining columns (from index 2 onward) are the values
-
-      List<int> valueRow = [];
-      for (int i = 2; i < row.length; i++) {
-        // Try to parse the string to an integer
-        int? value = int.tryParse(row[i].toString()); 
-        
-        // If the value is successfully parsed, add it to the list
-        if (value != null) {
-          valueRow.add(value);
-        } else {
-          // Handle invalid integer (e.g., if you want to add a default value, or handle the error)
-          valueRow.add(0); // Example: Add a default value of 0 for non-integer values
-        }
-        values.add(valueRow); // Add the value row to the values list
-      } 
-    }
-
-    // Notify listeners (if necessary)
-    notifyListeners();
-
-    // Return a record containing the extracted data
-    return (timestamps: timestamps, feet: feet, values: values);
-  }
-
-
-  void plotAnalysis(String path) async {
-    // Use the function to parse the file and get the data
-    ({List<int> timestamps, List<String> feet, List<List<int>> values}) data = await parseCsvFile(path);
-
-    // Access the fields
-    //print("Timestamps : ");print(data.timestamps);
-    //print("Length of timestamps: ${data.timestamps.length}");
-    //print("Feet : "); print(data.feet);
-    //print("Values: ${data.values}");
-  }
-
-
+  
 }
 
 class MyHomePage extends StatefulWidget {
@@ -135,11 +53,11 @@ class _MyHomePageState extends State<MyHomePage> {
       case 0:
         page = Analysis();
       case 1:
-        page = Page2();
+        page = Placeholder();
       case 2: 
         page = Placeholder();
       default:
-        throw UnimplementedError('no widget for $selectedIndex');
+        throw UnimplementedError('No widget for $selectedIndex');
     }
 
     return LayoutBuilder(builder: (context, constraints) {
@@ -151,12 +69,12 @@ class _MyHomePageState extends State<MyHomePage> {
                 extended: constraints.maxWidth >= 600,  // ← Here.
                 destinations: [
                   NavigationRailDestination(
-                    icon: Icon(Icons.home),
-                    label: Text('Page 1'),
+                    icon: Icon(Icons.scatter_plot_sharp),
+                    label: Text('Analyse'),
                   ),
                   NavigationRailDestination(
                     icon: Icon(Icons.favorite),
-                    label: Text('Page 2'),
+                    label: Text('Page 3'),
                   ),
                   NavigationRailDestination(
                     icon: Icon(Icons.settings),
@@ -184,43 +102,136 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+class IntegerSlider extends StatefulWidget {
+  @override
+  IntegerSliderState createState() => IntegerSliderState();
+}
 
-
-class Analysis extends StatelessWidget {
-
-
+class IntegerSliderState extends State<IntegerSlider> {
+  // Initial value for the slider
+  double _currentValue = 0;
 
   @override
   Widget build(BuildContext context) {
-    var appState = context.watch<MyAppState>();
-    var pair = appState.current;
-
-    IconData icon;
-    if (appState.favorites.contains(pair)) {
-      icon = Icons.favorite;
-    } else {
-      icon = Icons.favorite_border;
-    }
-
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          BigCard(pair: pair),
-          SizedBox(height: 10),
-          ElevatedButton(
-                onPressed: () {
-                  appState.plotAnalysis("data/240704_1214_standing_old-board.csv");
-                },
-                child: Text('Analyse'),
-              ),
+        children: <Widget>[
+          // Slider widget for choosing integer values
+          Slider(
+            value: _currentValue,
+            min: 0,
+            max: 16,
+            divisions: 100,  // Makes the slider snap to integer values
+            label: _currentValue.round().toString(),
+            onChanged: (value) {
+              setState(() {
+                _currentValue = value;
+              });
+            },
+          ),
+          Text(
+            'Selected value: ${_currentValue.round()}',
+            style: TextStyle(fontSize: 24),
+          ),
         ],
       ),
     );
   }
 }
 
-class Page2 extends StatelessWidget {
+class Analysis extends StatefulWidget {
+  @override
+  AnalysisState createState() => AnalysisState();
+}
+
+class AnalysisState extends State<Analysis> {
+  List<int> timestamps = [];
+  List<String> feet = [];
+  List<List<int>> values =  [];
+
+
+  int _current_plot = 0;
+  bool _isLoading = true;
+
+
+  // Your async function
+  Future<void> fetchData() async {
+    var data = await parseCsvFile("data/240704_1214_standing_old-board.csv");
+    setState(() {
+      timestamps = data.timestamps;
+      feet   = data.feet;
+      values = data.values;
+
+      _isLoading = false;
+    });
+  }
+
+    @override
+  void initState() {
+    super.initState();
+    fetchData(); // Start fetching data when the widget is initialized
+  }
+
+  Widget chooseWidget() {
+    if (_isLoading) {
+      return CircularProgressIndicator();
+    }
+    else {
+      var x = timestamps;
+      var y = values[15];
+      //var x = [1,2,3,4];
+      //var y = [5,6,7,8];
+      return SizedBox(
+        width: double.infinity,
+        height: 300,
+        child: LineChart(
+          LineChartData(
+            lineBarsData: [
+              LineChartBarData(
+                isCurved: true, // Smooth curve
+                spots: List.generate(
+                  x.length,
+                  (index) => FlSpot(x[index].toDouble(), y[index].toDouble()),
+                ),
+                color: Colors.blue, // Line color
+                barWidth: 3,          // Line thickness
+                dotData: FlDotData(show: true), // Show points on the line
+              ),
+            ],
+            gridData: FlGridData(show: true), // Optional grid
+            borderData: FlBorderData(show: true), // Optional border
+          ),
+        ),
+      );
+    }
+  }
+
+
+
+  @override
+  Widget build(BuildContext context) {
+    var appState = context.watch<MyAppState>();
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          chooseWidget(),
+          IntegerSlider(),
+          ElevatedButton(
+            onPressed: () {
+              //({List<int> timestamps, List<String> feet, List<List<int>> values}) data = await appState.parseCsvFile("data/240704_1214_standing_old-board.csv");
+            },
+            child: Text('Load Data'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/* class Page2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
@@ -246,7 +257,9 @@ class Page2 extends StatelessWidget {
       ],
     );
   }
-}
+} */
+
+
 
 
 
@@ -284,3 +297,96 @@ class BigCard extends StatelessWidget {
   }
 
 }
+
+
+
+List<List<int>> transpose(List<List<int>> matrix) {
+  if (matrix.isEmpty) return [];
+
+  int rows = matrix.length;
+  int cols = matrix[0].length;
+
+  // Create an empty matrix with dimensions flipped
+  List<List<int>> transposed = List.generate(cols, (_) => List.filled(rows, 0));
+
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < cols; j++) {
+      transposed[j][i] = matrix[i][j];
+    }
+  }
+
+  return transposed;
+}
+
+
+  Future<({
+    List<int> timestamps,
+    List<String> feet,
+    List<List<int>> values,
+  })> parseCsvFile(String filePath) async {
+    // Load the CSV file from assets
+    final String csvData = await rootBundle.loadString(filePath);
+
+    // Parse the CSV
+    List<List<dynamic>> rows = const CsvToListConverter().convert(csvData);
+
+    // Debug info
+    print(rows);
+    print(rows[0]);
+    int numRows = rows.length;
+    int numCols = rows.isNotEmpty ? rows[0].length : 0;
+    print('Dimensions: $numRows x $numCols');
+
+  // Convert to NxM list using slices extension
+    int slices = 19;
+    final list2d = rows[0].slices(slices).toList();
+
+    // Debug info
+    print(list2d);
+    print(list2d[0]);
+    int numRowss = list2d.length;
+    int numColss = list2d.isNotEmpty ? list2d[0].length : 0;
+    print('Dimensions: $numRowss x $numColss');
+
+    // Initialize arrays
+    List<int> timestamps = [];
+    List<String> feet = [];
+    List<List<int>> values = [];
+
+    // Extract data from rows
+    for (var row in list2d) {
+      timestamps.add(row[0] as int); 
+      feet.add(row[1] as String); 
+      // The remaining columns (from index 2 onward) are the values
+
+      List<int> valueRow = [];
+      for (int i = 2; i < row.length; i++) {
+        // Try to parse the string to an integer
+        int? value = int.tryParse(row[i].toString()); 
+        
+        // If the value is successfully parsed, add it to the list
+        if (value != null) {
+          valueRow.add(value);
+        } else {
+          // Handle invalid integer (e.g., if you want to add a default value, or handle the error)
+          valueRow.add(0); // Example: Add a default value of 0 for non-integer values
+        }
+        values.add(valueRow); // Add the value row to the values list
+      } 
+    }
+    List<List<int>> valuesTransposed = transpose(values).toList();
+
+    // Return a record containing the extracted data
+    return (timestamps: timestamps, feet: feet, values: valuesTransposed);
+  }
+
+
+  void plotAnalysis(String path) async {
+    // Use the function to parse the file and get the data
+    ({List<int> timestamps, List<String> feet, List<List<int>> values}) data = await parseCsvFile(path);
+
+    // Access the fields
+    print("Values: ${data.values}");
+    print("Timestamps : ");print(data.timestamps);
+    print("Feet : "); print(data.feet);
+  }
