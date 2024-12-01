@@ -2,7 +2,7 @@ import 'package:english_words/english_words.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'dart:convert'; // For utf8
+import 'dart:math';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart'; // For CSV parsing
 import 'package:collection/collection.dart';
@@ -33,10 +33,25 @@ class MyApp extends StatelessWidget {
 
 class MyAppState extends ChangeNotifier {
   int currentPlot = 0;
+  bool isRecording = false;
+  bool isDarkMode = false;
+  bool isClockLaunched = false;
 
   // put some states change there
   void toggleCurrentPlot(int value) {
     currentPlot = value;
+    notifyListeners();
+  }
+
+  void toggleRecording() {
+    isRecording = !isRecording;
+    isClockLaunched = !isClockLaunched;
+    notifyListeners();
+  }
+
+  void toggleDarkMode() {
+    isDarkMode = !isDarkMode;
+    notifyListeners();
   }
 
   
@@ -57,9 +72,9 @@ class _MyHomePageState extends State<MyHomePage> {
       case 0:
         page = Analysis();
       case 1:
-        page = Placeholder();
+        page = Recording();
       case 2: 
-        page = Placeholder();
+        page = Settings();
       default:
         throw UnimplementedError('No widget for $selectedIndex');
     }
@@ -77,8 +92,8 @@ class _MyHomePageState extends State<MyHomePage> {
                     label: Text('Analyse'),
                   ),
                   NavigationRailDestination(
-                    icon: Icon(Icons.favorite),
-                    label: Text('Page 3'),
+                    icon: Icon(Icons.record_voice_over),
+                    label: Text('Recording'),
                   ),
                   NavigationRailDestination(
                     icon: Icon(Icons.settings),
@@ -229,7 +244,7 @@ class AnalysisState extends State<Analysis> {
             label: appState.currentPlot.round().toString(),
             onChanged: (value) {
               setState(() {
-                appState.currentPlot = value.toInt();
+                appState.currentPlot = value.clamp(0, 15).toInt(); // Clamp prevents crash through overflow
               });
             },
           ),
@@ -247,33 +262,107 @@ class AnalysisState extends State<Analysis> {
   }
 }
 
-/* class Page2 extends StatelessWidget {
+class Recording extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
 
-    if (appState.favorites.isEmpty) {
-      return Center(
-        child: Text('No favorites yet.'),
-      );
-    }
-
-    return ListView(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text('You have '
-              '${appState.favorites.length} favorites:'),
-        ),
-        for (var pair in appState.favorites)
-          ListTile(
-            leading: Icon(Icons.favorite),
-            title: Text(pair.asLowerCase),
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            appState.isRecording ? "Recording in progress" : "Recording stopped",
+            style: TextStyle(
+              fontSize: 24.0,               
+              fontWeight: FontWeight.bold  
+            )
           ),
-      ],
+
+          StreamBuilder<int>(
+            stream: Stream.periodic(Duration(milliseconds: 10), (count) => count),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.active && appState.isClockLaunched) {
+                int count = snapshot.data ?? 0;
+                int minutes = count ~/60000;
+                int seconds      = (count ~/ 100)%60; // Divide by 100 to get minutes
+                int centiseconds = (count)%100;  // Divide by 10 to get seconds
+                   // Get the last digit for centiseconds
+
+                return Text(
+                  '$minutes:${seconds.toString().padLeft(2, '0')}.${centiseconds.toString().padLeft(2, '0')}', // Format as mm:ss.cc
+                  style: TextStyle(fontSize: 50),
+                );
+              }
+              return Text(
+                "0:00.00",
+                style: TextStyle(fontSize: 50)
+              );
+            },
+          ),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: IconButton(
+                  icon: Icon(appState.isRecording ? Icons.play_arrow : Icons.pause),
+                  iconSize: 64.0,
+                  color: Colors.brown,
+                  onPressed: () {
+                    appState.toggleRecording();
+                  },
+                ),
+              ),
+    
+            ],
+          ),
+        ],
+      )
     );
+
   }
-} */
+}
+
+class Settings extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    var appState = context.watch<MyAppState>();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Settings'),
+      ),
+      body: ListView(
+        children: <Widget>[
+          ListTile(
+            title: Text('Dark Mode'),
+            trailing: Switch(
+              value: appState.isDarkMode,
+              onChanged: (bool value) {
+                appState.toggleDarkMode();
+              },
+            ),
+          ),
+          ListTile(
+            title: Text('Language'),
+            trailing: Icon(Icons.arrow_forward),
+            onTap: () {
+              // Handle navigation to language settings
+            },
+          ),
+          ListTile(
+            title: Text('Many things to be added ...'),
+            trailing: Icon(Icons.backpack)
+          ),
+
+        ]
+      )
+    );
+
+  }
+}
 
 
 
@@ -311,7 +400,6 @@ class BigCard extends StatelessWidget {
       ),
     );
   }
-
 }
 
 
@@ -346,9 +434,12 @@ List<List<int>> transpose(List<List<int>> matrix) {
     // Parse the CSV
     List<List<dynamic>> rows = const CsvToListConverter().convert(csvData);
 
+    print(rows);
+
   // Convert to NxM list using slices extension
     int slices = 18;
     final list2d = rows[0].slices(slices).toList();
+    print(list2d);
 
 
     // Initialize arrays
@@ -378,6 +469,10 @@ List<List<int>> transpose(List<List<int>> matrix) {
       } 
     }
     List<List<int>> valuesTransposed = transpose(values).toList();
+
+    // Substract the min value to the timestamps
+    int minValue = timestamps.reduce(min);
+    timestamps = timestamps.map((number) => number - minValue).toList();
 
     // Return a record containing the extracted data
     return (timestamps: timestamps, feet: feet, values: valuesTransposed);
