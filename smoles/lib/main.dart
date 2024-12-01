@@ -347,7 +347,7 @@ List<List<int>> transpose(List<List<int>> matrix) {
     List<List<dynamic>> rows = const CsvToListConverter().convert(csvData);
 
   // Convert to NxM list using slices extension
-    int slices = 19;
+    int slices = 18;
     final list2d = rows[0].slices(slices).toList();
 
 
