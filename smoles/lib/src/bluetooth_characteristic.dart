@@ -66,7 +66,7 @@ class BluetoothCharacteristic {
       .where((p) => p.primaryServiceUuid == primaryServiceUuid)
       .where((p) => p.success == true)
       .map((c) => c.value)
-      .newStreamWithInitialValue(lastValue);
+      ._StreamNewStreamWithInitialValue.newStreamWithInitialValue(lastValue);
 
   /// this stream emits values:
   ///   - anytime `read()` is called
